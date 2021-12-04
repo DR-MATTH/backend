@@ -1,9 +1,22 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import psycopg2
+from datetime import date
+import json
+
+# para leer las fechas de la base de datos como string
+
+
+class DateEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, date):
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
+
 
 app = Flask(__name__)
 CORS(app)
+app.json_encoder = DateEncoder
 
 # utilizando una base de datos en la nube
 # servicio de ElephantSQL
@@ -14,6 +27,25 @@ conn = psycopg2.connect(
     password='ZNt-0Xz6h2zq_GWs6YbzCjAlgtKbryQh'
 )
 cur = conn.cursor()
+
+# 0 es domingo 6 es sabado
+
+
+def convertir_dia(numero_dia: int):
+    if numero_dia == 0:
+        return 'Domingo'
+    if numero_dia == 1:
+        return 'Lunes'
+    if numero_dia == 2:
+        return 'Martes'
+    if numero_dia == 3:
+        return 'Miércoles'
+    if numero_dia == 4:
+        return 'Jueves'
+    if numero_dia == 5:
+        return 'Viernes'
+    if numero_dia == 6:
+        return 'Sábado'
 
 
 @app.route('/')
@@ -52,9 +84,20 @@ def pelicula(id_pelicula):
     }
 
 
-@app.route('/funciones', methods=['POST'])
-def funciones():
-    return
+@app.route('/funciones/<int:id_pelicula>')
+def funciones(id_pelicula):
+    cur.execute('''select extract(dow from fecha_hora), DATE(fecha_hora), butacas_disponibles, s.tipo 
+	from funciones f inner join salas s on f.id_sala = s.id where id_pelicula = %s''',
+                (id_pelicula,))
+    datos = []
+    for fila in cur.fetchall():
+        datos.append({
+            'dia': convertir_dia(int(fila[0])),
+            'fecha': fila[1],
+            'butacas': fila[2],
+            'tipo': fila[3],
+        })
+    return jsonify(datos)
 
 
 @app.route('/comprar', methods=['POST'])
